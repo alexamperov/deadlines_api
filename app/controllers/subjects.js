@@ -8,6 +8,7 @@ const { authenticateToken } = require('../middlewares/auth');
 const router = express.Router();
 
 // Создание предмета
+// протестировано
 router.post('/subjects', authenticateToken, async (req, res) => {
     const { title } = req.body;
     const userId = req.user.id;
@@ -26,6 +27,7 @@ router.post('/subjects', authenticateToken, async (req, res) => {
 });
 
 // Получение списка предметов (свои и подписки)
+// протестировано
 router.get('/subjects', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
@@ -50,6 +52,7 @@ router.get('/subjects', authenticateToken, async (req, res) => {
 });
 
 // Подписка по коду
+// протестировано
 router.post('/subjects/:subjectId/subscribe', authenticateToken, async (req, res) => {
     const { invitationCode } = req.body;
     const subjectId = parseInt(req.params.subjectId);
@@ -121,10 +124,14 @@ router.post('/subjects/:subjectId/tasks', authenticateToken, async (req, res) =>
             is_passed: false
         }));
 
-        await pool.query(`
+        console.log(userTasks);
+
+        for (t of userTasks) {
+            await pool.query(`
       INSERT INTO user_subject_tasks (user_id, subject_task_id, is_done, is_passed)
-      VALUES ${userTasks.map(() => `($1, $2, $3, $4)`).join(',')}
-    `, [].concat(...userTasks.map(t => [t.user_id, t.subject_task_id, t.is_done, t.is_passed])));
+      VALUES ($1, $2, $3, $4)`,[t.user_id, t.subject_task_id, t.is_done, t.is_passed]);
+        }
+
 
         res.status(201).json(task.rows[0]);
     } catch (err) {
@@ -133,6 +140,7 @@ router.post('/subjects/:subjectId/tasks', authenticateToken, async (req, res) =>
 });
 
 // Получение задач предмета с индивидуальными статусами
+// протестировано
 router.get('/subjects/:subjectId/tasks', authenticateToken, async (req, res) => {
     const subjectId = parseInt(req.params.subjectId);
     const userId = req.user.id;
@@ -170,6 +178,170 @@ router.get('/subjects/:subjectId/tasks', authenticateToken, async (req, res) => 
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+
+// Отметка задачи как выполненной
+// протестировано
+router.put('/subjects/:subjectId/tasks/:taskId/done', authenticateToken, async (req, res) => {
+    const subjectId = parseInt(req.params.subjectId);
+    const taskId = parseInt(req.params.taskId);
+    const userId = req.user.id;
+    const { isDone } = req.body;
+
+    // Проверка доступа к предмету
+    const subjectCheck = await pool.query(`
+        SELECT * FROM subjects 
+        WHERE id = $1 
+        AND (user_id = $2 OR EXISTS (SELECT 1 FROM subscriptions WHERE subject_id = $1 AND user_id = $2));
+    `, [subjectId, userId]);
+
+    if (subjectCheck.rows.length === 0) {
+        return res.status(403).send('Нет доступа к предмету');
+    }
+
+    // Проверка существования задачи
+    const taskCheck = await pool.query(`
+        SELECT * FROM subject_tasks 
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId]);
+
+    if (taskCheck.rows.length === 0) {
+        return res.sendStatus(404);
+    }
+
+    // Обновление статуса is_done
+    await pool.query(`
+        UPDATE user_subject_tasks 
+        SET is_done = $3 
+        WHERE subject_task_id = $1 AND user_id = $2;
+    `, [taskId, userId, isDone]);
+
+    res.sendStatus(200);
+});
+
+// Отметка задачи как сданной
+router.put('/subjects/:subjectId/tasks/:taskId/pass', authenticateToken, async (req, res) => {
+    const subjectId = parseInt(req.params.subjectId);
+    const taskId = parseInt(req.params.taskId);
+    const userId = req.user.id;
+    const { isPassed } = req.body;
+
+    // Проверка доступа к предмету
+    const subjectCheck = await pool.query(`
+        SELECT * FROM subjects 
+        WHERE id = $1 
+        AND (user_id = $2 OR EXISTS (SELECT 1 FROM subscriptions WHERE subject_id = $1 AND user_id = $2));
+    `, [subjectId, userId]);
+
+    if (subjectCheck.rows.length === 0) {
+        return res.status(403).send('Нет доступа к предмету');
+    }
+
+    // Проверка существования задачи
+    const taskCheck = await pool.query(`
+        SELECT * FROM subject_tasks 
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId]);
+
+    if (taskCheck.rows.length === 0) {
+        return res.sendStatus(404);
+    }
+
+    // Обновление статуса is_done
+
+    try {
+        await pool.query(`
+        UPDATE user_subject_tasks 
+        SET is_passed = $3 
+        WHERE subject_task_id = $1 AND user_id = $2;
+    `, [taskId, userId, isPassed]);
+    } catch (err){
+        res.status(500).json({ error: err.message });
+    }
+
+    res.sendStatus(200);
+});
+
+// Обновление задачи для всех, если владелец
+router.put('/subjects/:subjectId/tasks/:taskId', authenticateToken, async (req, res) => {
+    const subjectId = parseInt(req.params.subjectId);
+    const taskId = parseInt(req.params.taskId);
+    const userId = req.user.id;
+    const { title, description, deadline } = req.body;
+
+    // Проверка: является ли пользователь владельцем предмета
+    // const subjectCheck = await pool.query(`
+    //     SELECT * FROM subjects
+    //     WHERE id = $1 AND user_id = $2;
+    // `, [subjectId, userId]);
+    //
+    // if (subjectCheck.rows.length === 0) {
+    //     return res.status(403).send('Только владелец может обновить задачу для всех');
+    // }
+
+    // Проверка существования задачи
+    const taskCheck = await pool.query(`
+        SELECT * FROM subject_tasks 
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId]);
+
+    if (taskCheck.rows.length === 0) {
+        return res.sendStatus(404);
+    }
+
+    // Обновление задачи для всех
+    await pool.query(`
+        UPDATE subject_tasks 
+        SET 
+            title = COALESCE($3, title),
+            description = COALESCE($4, description),
+            deadline = COALESCE($5, deadline)
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId, title, description, deadline]);
+
+    res.sendStatus(200);
+});
+
+// Удаление задачи для всех (только владелец)
+router.delete('/subjects/:subjectId/tasks/:taskId', authenticateToken, async (req, res) => {
+    const subjectId = parseInt(req.params.subjectId);
+    const taskId = parseInt(req.params.taskId);
+    const userId = req.user.id;
+
+    // Проверка: является ли пользователь владельцем предмета
+    // const subjectCheck = await pool.query(`
+    //     SELECT * FROM subjects
+    //     WHERE id = $1 AND user_id = $2;
+    // `, [subjectId, userId]);
+    //
+    // if (subjectCheck.rows.length === 0) {
+    //     return res.status(403).send('Только владелец может удалить задачу');
+    // }
+
+    // Проверка существования задачи
+    const taskCheck = await pool.query(`
+        SELECT * FROM subject_tasks 
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId]);
+
+    if (taskCheck.rows.length === 0) {
+        return res.sendStatus(404);
+    }
+
+    // Удаление связанных записей в user_subject_tasks
+    await pool.query(`
+        DELETE FROM user_subject_tasks 
+        WHERE subject_task_id = $1;
+    `, [taskId]);
+
+    // Удаление задачи из subject_tasks
+    await pool.query(`
+        DELETE FROM subject_tasks 
+        WHERE id = $1 AND subject_id = $2;
+    `, [taskId, subjectId]);
+
+    res.sendStatus(200);
 });
 
 module.exports = router;

@@ -45,5 +45,6 @@ CREATE TABLE personal_tasks (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
+    is_done BOOLEAN DEFAULT false,
     user_id INT REFERENCES users(id) NOT NULL
 );

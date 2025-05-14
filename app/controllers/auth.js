@@ -2,20 +2,13 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
-const { check, validationResult } = require('express-validator');
 
 const router = express.Router();
 
 // Регистрация
 router.post(
     '/register',
-    [
-        check('username').isLength({ min: 3 }),
-        check('password').isLength({ min: 6 })
-    ],
     async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
         const { username, password } = req.body;
 
