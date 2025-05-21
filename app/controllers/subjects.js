@@ -10,15 +10,15 @@ const router = express.Router();
 // Создание предмета
 // протестировано
 router.post('/subjects', authenticateToken, async (req, res) => {
-    const { title } = req.body;
+    const { title, description } = req.body;
     const userId = req.user.id;
 
     try {
         const result = await pool.query(`
-      INSERT INTO subjects (title, user_id)
-      VALUES ($1, $2)
+      INSERT INTO subjects (title, user_id, description)
+      VALUES ($1, $2, $3)
       RETURNING *;
-    `, [title, userId]);
+    `, [title, userId, description]);
 
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -46,6 +46,29 @@ router.get('/subjects', authenticateToken, async (req, res) => {
     `, [userId]);
 
         res.json([...owned.rows, ...subscribedSubjects.rows]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Получение одного предмета по ID (если пользователь владеет или подписан)
+router.get('/subjects/:id', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const subjectId = parseInt(req.params.id);
+
+    try {
+        // Проверяем, принадлежит ли предмет пользователю или он подписан на него
+        const result = await pool.query(`
+            SELECT s.* FROM subjects s
+            LEFT JOIN subscriptions sub ON s.id = sub.subject_id AND sub.user_id = $1
+            WHERE s.id = $2 AND (s.user_id = $1 OR sub.user_id IS NOT NULL)
+        `, [userId, subjectId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Subject not found or access denied' });
+        }
+
+        res.json(result.rows[0]);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
