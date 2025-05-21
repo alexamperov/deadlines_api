@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/forgot-password
-exports.forgotPassword = async (req, res) => {
+router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -89,9 +89,9 @@ exports.forgotPassword = async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-};
+})
 // POST /api/verify-code
-exports.verifyCode = async (req, res) => {
+router.post('/verify-code', async (req, res) => {
     try {
         const { email, code } = req.body;
 
@@ -109,10 +109,10 @@ exports.verifyCode = async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-};
+})
 
 // POST /api/verify-code
-exports.verifyCode = async (req, res) => {
+router.post('/change-password', async (req, res) => {
     try {
         const { email, code } = req.body;
 
@@ -130,6 +130,6 @@ exports.verifyCode = async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-};
+})
 
 module.exports = router;
