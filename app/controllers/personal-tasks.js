@@ -24,7 +24,7 @@ router.get('/personal-tasks', authenticateToken, async (req, res) => {
 
 // 2. Создание персональной задачи
 router.post('/personal-tasks', authenticateToken, async (req, res) => {
-    const { title} = req.body; // Описание необязательно
+    const { title, description} = req.body; // Описание необязательно
     const userId = req.user.id;
 
     try {
@@ -35,10 +35,10 @@ router.post('/personal-tasks', authenticateToken, async (req, res) => {
         // `, [title, description, userId]);
 
         const result = await pool.query(`
-            INSERT INTO personal_tasks (title, user_id)
-            VALUES ($1, $2)
+            INSERT INTO personal_tasks (title, user_id, description)
+            VALUES ($1, $2, $3)
             RETURNING *;
-        `, [title, userId]);
+        `, [title, userId,description]);
 
         res.status(201).json(result.rows[0]);
     } catch (err) {

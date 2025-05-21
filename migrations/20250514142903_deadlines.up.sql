@@ -46,6 +46,8 @@ CREATE TABLE user_subject_tasks (
 CREATE TABLE personal_tasks (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
+    deadline timestamp not null,
+    description varchar(255),
     created_at TIMESTAMP DEFAULT NOW(),
     is_done BOOLEAN DEFAULT false,
     user_id INT REFERENCES users(id) NOT NULL

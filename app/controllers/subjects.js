@@ -74,6 +74,35 @@ router.get('/subjects/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// DELETE /api/subjects/:id
+router.delete('/subjects/:id', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const subjectId = parseInt(req.params.id);
+
+    if (isNaN(subjectId)) {
+        return res.status(400).json({ error: 'Invalid subject ID' });
+    }
+
+    try {
+        // Проверяем, что предмет существует и принадлежит пользователю
+        const result = await pool.query(`
+            SELECT * FROM subjects
+            WHERE id = $1 AND user_id = $2
+        `, [subjectId, userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Subject not found or access denied' });
+        }
+
+        // Удаляем предмет
+        await pool.query('DELETE FROM subjects WHERE id = $1', [subjectId]);
+
+        res.json({ message: 'Subject deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Подписка по коду
 // протестировано
 router.post('/subjects/:subjectId/subscribe', authenticateToken, async (req, res) => {
